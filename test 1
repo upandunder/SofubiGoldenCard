@@ -69,6 +69,12 @@
         import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
         
         let scene, camera, renderer, model;
+
+        // Variables para rotación con inercia
+        let isDragging = false;
+        let previousMousePosition = { x: 0, y: 0 };
+        let rotationVelocityX = 0;
+        let rotationVelocityY = 0;
         
         function init() {
             // Scene
@@ -76,11 +82,12 @@
             
             // Camera
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.set(0, 0, 3);
+            camera.position.set(0, 0, 4);
             
-            // Renderer
+            // Renderer optimizado
             renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // mejora 3
             renderer.setClearColor(0x000000, 0);
             renderer.shadowMap.enabled = true;
             renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -95,10 +102,62 @@
             directionalLight.castShadow = true;
             scene.add(directionalLight);
             
-            // Point light for dramatic effect
-            const pointLight = new THREE.PointLight(0x6699ff, 0.8, 100);
+            const pointLight = new THREE.PointLight(0x6699ff, 9, 100);
             pointLight.position.set(0, 5, 0);
             scene.add(pointLight);
+            
+            const fillLight = new THREE.HemisphereLight(0xffffff, 0x444444, 9);
+            scene.add(fillLight);
+            
+            const leftZenitalLight = new THREE.DirectionalLight(0xffffff, 0.6);
+            leftZenitalLight.position.set(-5, 10, 0);
+            leftZenitalLight.castShadow = true;
+            scene.add(leftZenitalLight);
+            
+            const rightZenitalLight = new THREE.DirectionalLight(0xffffff, 0.6);
+            rightZenitalLight.position.set(5, 10, 0);
+            rightZenitalLight.castShadow = true;
+            scene.add(rightZenitalLight);
+
+            // Entorno HDR simulado con CubeTexture (mejora 1)
+            const envLoader = new THREE.CubeTextureLoader();
+            const envMap = envLoader.load([
+                'https://threejs.org/examples/textures/cube/Bridge2/posx.jpg',
+                'https://threejs.org/examples/textures/cube/Bridge2/negx.jpg',
+                'https://threejs.org/examples/textures/cube/Bridge2/posy.jpg',
+                'https://threejs.org/examples/textures/cube/Bridge2/negy.jpg',
+                'https://threejs.org/examples/textures/cube/Bridge2/posz.jpg',
+                'https://threejs.org/examples/textures/cube/Bridge2/negz.jpg'
+            ]);
+            scene.environment = envMap;
+            
+            // Mouse controls con inercia (mejora 2)
+            renderer.domElement.addEventListener('mousedown', (event) => {
+                isDragging = true;
+                previousMousePosition.x = event.clientX;
+                previousMousePosition.y = event.clientY;
+            });
+            
+            renderer.domElement.addEventListener('mousemove', (event) => {
+                if (isDragging && model) {
+                    const deltaX = event.clientX - previousMousePosition.x;
+                    const deltaY = event.clientY - previousMousePosition.y;
+
+                    rotationVelocityY = deltaX * 0.005;
+                    rotationVelocityX = deltaY * 0.0025;
+
+                    previousMousePosition.x = event.clientX;
+                    previousMousePosition.y = event.clientY;
+                }
+            });
+            
+            renderer.domElement.addEventListener('mouseup', () => {
+                isDragging = false;
+            });
+            
+            renderer.domElement.addEventListener('mouseleave', () => {
+                isDragging = false;
+            });
             
             // Load GLTF model
             const loader = new GLTFLoader();
@@ -110,19 +169,36 @@
                     console.log('Model loaded successfully:', gltf);
                     model = gltf.scene;
                     
-                    // Center the model
+                    // Material dorado con reflejos HDR
+                    const goldMaterial = new THREE.MeshStandardMaterial({
+                        color: 0xb8860b,
+                        metalness: 1,
+                        roughness: 0.2,
+                        envMap: envMap,
+                        envMapIntensity: 1.5
+                    });
+                    
+                    model.traverse((child) => {
+                        if (child.isMesh) {
+                            child.material = goldMaterial;
+                            child.castShadow = true;
+                            child.receiveShadow = true;
+                        }
+                    });
+                    
+                    // Centrar modelo
                     const box = new THREE.Box3().setFromObject(model);
                     const center = box.getCenter(new THREE.Vector3());
                     model.position.sub(center);
                     
-                    // Scale if needed
+                    // Escalar si es necesario
                     const size = box.getSize(new THREE.Vector3());
                     const maxDim = Math.max(size.x, size.y, size.z);
                     const scale = 4 / maxDim;
                     model.scale.setScalar(scale);
                     
                     scene.add(model);
-                    console.log('Model added to scene');
+                    console.log('Model added to scene with gold material');
                 },
                 function(progress) {
                     console.log('Loading progress: ', (progress.loaded / progress.total * 100) + '%');
@@ -130,7 +206,7 @@
                 function(error) {
                     console.error('Error loading model: ', error);
                     
-                    // Add a simple cube as fallback
+                    // Fallback cube
                     const geometry = new THREE.BoxGeometry(2, 2, 2);
                     const material = new THREE.MeshStandardMaterial({ color: 0x6699ff });
                     const cube = new THREE.Mesh(geometry, material);
@@ -149,7 +225,16 @@
         
         function animate() {
             requestAnimationFrame(animate);
-            
+
+            if (model) {
+                model.rotation.y += rotationVelocityY;
+                model.rotation.x += rotationVelocityX;
+
+                // Suavizar inercia
+                rotationVelocityX *= 0.95;
+                rotationVelocityY *= 0.95;
+            }
+
             renderer.render(scene, camera);
         }
         
