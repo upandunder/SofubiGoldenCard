@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dark Gradient Background with Jewelry Glow</title>
+    <title>Dark Gradient Background</title>
     <style>
         * {
             margin: 0;
@@ -14,7 +14,7 @@
         body, html {
             height: 100%;
             overflow: hidden;
-            touch-action: none;
+            touch-action: none; /* Previene el scroll en móviles */
         }
         
         body {
@@ -52,7 +52,7 @@
             top: 0;
             left: 0;
             z-index: 1;
-            touch-action: none;
+            touch-action: none; /* Importante para evitar comportamientos no deseados en móviles */
         }
     </style>
 </head>
@@ -71,57 +71,6 @@
         import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
         
         let scene, camera, renderer, model;
-        let sparklePoints, sparkleGeometry, sparkleMaterial;
-        let glowSphere;
-        
-        function createElegantEnvironment() {
-            // Crear un canvas para el ambiente 360°
-            const canvas = document.createElement('canvas');
-            canvas.width = 512;
-            canvas.height = 512;
-            const ctx = canvas.getContext('2d');
-            
-            // Crear gradiente radial elegante
-            const centerX = canvas.width / 2;
-            const centerY = canvas.height / 2;
-            const radius = canvas.width / 2;
-            
-            const gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, radius);
-            
-            // Gradiente desde el centro (más claro) hacia afuera (más oscuro)
-            gradient.addColorStop(0, '#2a2a3a');    // Centro gris medio
-            gradient.addColorStop(0.3, '#1a1a2e');  // Transición
-            gradient.addColorStop(0.6, '#0f0f1a');  // Más oscuro
-            gradient.addColorStop(1, '#050508');    // Borde muy oscuro
-            
-            ctx.fillStyle = gradient;
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            
-            // Añadir algunos puntos de luz sutiles para elegancia
-            const numLights = 8;
-            for (let i = 0; i < numLights; i++) {
-                const angle = (i / numLights) * Math.PI * 2;
-                const distance = radius * 0.7;
-                const x = centerX + Math.cos(angle) * distance;
-                const y = centerY + Math.sin(angle) * distance;
-                
-                const lightGradient = ctx.createRadialGradient(x, y, 0, x, y, 30);
-                lightGradient.addColorStop(0, 'rgba(255, 255, 255, 0.1)');
-                lightGradient.addColorStop(0.5, 'rgba(200, 200, 255, 0.05)');
-                lightGradient.addColorStop(1, 'rgba(150, 150, 200, 0)');
-                
-                ctx.fillStyle = lightGradient;
-                ctx.fillRect(x - 30, y - 30, 60, 60);
-            }
-            
-            // Crear textura desde el canvas
-            const texture = new THREE.CanvasTexture(canvas);
-            texture.mapping = THREE.EquirectangularReflectionMapping;
-            texture.wrapS = THREE.RepeatWrapping;
-            texture.wrapT = THREE.ClampToEdgeWrapping;
-            
-            return texture;
-        }
 
         // Variables para rotación con inercia
         let isDragging = false;
@@ -144,56 +93,45 @@
             renderer.setClearColor(0x000000, 0);
             renderer.shadowMap.enabled = true;
             renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-            renderer.toneMapping = THREE.ACESFilmicToneMapping;
-            renderer.toneMappingExposure = 1.5;
             document.body.appendChild(renderer.domElement);
             
-            // Lights mejoradas para joyería
-            const ambientLight = new THREE.AmbientLight(0x404040, 0.3);
+            // Lights
+            const ambientLight = new THREE.AmbientLight(0x404040, 0.4);
             scene.add(ambientLight);
             
-            const directionalLight = new THREE.DirectionalLight(0xffffff, 2);
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
             directionalLight.position.set(0, 10, 5);
             directionalLight.castShadow = true;
-            directionalLight.shadow.mapSize.width = 2048;
-            directionalLight.shadow.mapSize.height = 2048;
             scene.add(directionalLight);
             
-            // Luces específicas para crear brillos de joyería
-            const keyLight = new THREE.PointLight(0xffffff, 3, 100);
-            keyLight.position.set(5, 5, 5);
-            scene.add(keyLight);
+            const pointLight = new THREE.PointLight(0x6699ff, 9, 100);
+            pointLight.position.set(0, 5, 0);
+            scene.add(pointLight);
             
-            const fillLight = new THREE.PointLight(0x6699ff, 2, 100);
-            fillLight.position.set(-5, 0, 5);
+            const fillLight = new THREE.HemisphereLight(0xffffff, 0x444444, 9);
             scene.add(fillLight);
             
-            const rimLight = new THREE.PointLight(0xffaa55, 1.5, 100);
-            rimLight.position.set(0, -5, -5);
-            scene.add(rimLight);
+            const leftZenitalLight = new THREE.DirectionalLight(0xffffff, 0.6);
+            leftZenitalLight.position.set(-5, 10, 0);
+            leftZenitalLight.castShadow = true;
+            scene.add(leftZenitalLight);
             
-            // Luz dorada para realzar el oro
-            const goldLight = new THREE.PointLight(0xffd700, 2, 100);
-            goldLight.position.set(3, 3, 3);
-            scene.add(goldLight);
-            
-            const goldLight2 = new THREE.PointLight(0xffd700, 1.5, 100);
-            goldLight2.position.set(-3, -3, 3);
-            scene.add(goldLight2);
+            const rightZenitalLight = new THREE.DirectionalLight(0xffffff, 0.6);
+            rightZenitalLight.position.set(5, 10, 0);
+            rightZenitalLight.castShadow = true;
+            scene.add(rightZenitalLight);
 
-            // Hemisphere light para suavidad general
-            const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.8);
-            scene.add(hemiLight);
-
-            // Crear ambiente 360° elegante y oscuro
-            const envMap = createElegantEnvironment();
+            // Entorno HDR simulado con CubeTexture
+            const envLoader = new THREE.CubeTextureLoader();
+            const envMap = envLoader.load([
+                'https://threejs.org/examples/textures/cube/Bridge2/posx.jpg',
+                'https://threejs.org/examples/textures/cube/Bridge2/negx.jpg',
+                'https://threejs.org/examples/textures/cube/Bridge2/posy.jpg',
+                'https://threejs.org/examples/textures/cube/Bridge2/negy.jpg',
+                'https://threejs.org/examples/textures/cube/Bridge2/posz.jpg',
+                'https://threejs.org/examples/textures/cube/Bridge2/negz.jpg'
+            ]);
             scene.environment = envMap;
-            
-            // Crear sistema de partículas para destellos
-            createSparkles();
-            
-            // Crear halo de brillo
-            createGlowEffect();
             
             // Función unificada para obtener posición
             function getEventPosition(event) {
@@ -254,26 +192,18 @@
                     console.log('Model loaded successfully:', gltf);
                     model = gltf.scene;
                     
-                    // Material dorado premium con brillo de joyería
-                    const jewelryMaterial = new THREE.MeshPhysicalMaterial({
-                        color: 0xdaa520,
-                        metalness: 1.0,
-                        roughness: 0.05,
+                    // Material dorado con reflejos HDR
+                    const goldMaterial = new THREE.MeshStandardMaterial({
+                        color: 0xb8860b,
+                        metalness: 1,
+                        roughness: 0.2,
                         envMap: envMap,
-                        envMapIntensity: 2.5,
-                        clearcoat: 1.0,
-                        clearcoatRoughness: 0.01,
-                        reflectivity: 1.0,
-                        ior: 2.4,
-                        transmission: 0.1,
-                        thickness: 0.5,
-                        emissive: 0x221100,
-                        emissiveIntensity: 0.3
+                        envMapIntensity: 1.5
                     });
                     
                     model.traverse((child) => {
                         if (child.isMesh) {
-                            child.material = jewelryMaterial;
+                            child.material = goldMaterial;
                             child.castShadow = true;
                             child.receiveShadow = true;
                         }
@@ -291,7 +221,7 @@
                     model.scale.setScalar(scale);
                     
                     scene.add(model);
-                    console.log('Model added to scene with jewelry material');
+                    console.log('Model added to scene with gold material');
                 },
                 function(progress) {
                     console.log('Loading progress: ', (progress.loaded / progress.total * 100) + '%');
@@ -299,21 +229,13 @@
                 function(error) {
                     console.error('Error loading model: ', error);
                     
-                    // Fallback cube con material de joyería
+                    // Fallback cube
                     const geometry = new THREE.BoxGeometry(2, 2, 2);
-                    const jewelryMaterial = new THREE.MeshPhysicalMaterial({
-                        color: 0xdaa520,
-                        metalness: 1.0,
-                        roughness: 0.05,
-                        envMap: envMap,
-                        envMapIntensity: 2.5,
-                        clearcoat: 1.0,
-                        clearcoatRoughness: 0.01
-                    });
-                    const cube = new THREE.Mesh(geometry, jewelryMaterial);
+                    const material = new THREE.MeshStandardMaterial({ color: 0x6699ff });
+                    const cube = new THREE.Mesh(geometry, material);
                     scene.add(cube);
                     model = cube;
-                    console.log('Added fallback cube with jewelry material');
+                    console.log('Added fallback cube');
                 }
             );
             
@@ -324,110 +246,8 @@
             animate();
         }
         
-        function createSparkles() {
-            // Crear partículas de destello
-            const sparkleCount = 50;
-            const positions = new Float32Array(sparkleCount * 3);
-            const colors = new Float32Array(sparkleCount * 3);
-            const sizes = new Float32Array(sparkleCount);
-            
-            for (let i = 0; i < sparkleCount; i++) {
-                positions[i * 3] = (Math.random() - 0.5) * 10;
-                positions[i * 3 + 1] = (Math.random() - 0.5) * 10;
-                positions[i * 3 + 2] = (Math.random() - 0.5) * 10;
-                
-                colors[i * 3] = 1.0;
-                colors[i * 3 + 1] = 0.8 + Math.random() * 0.2;
-                colors[i * 3 + 2] = 0.3 + Math.random() * 0.3;
-                
-                sizes[i] = Math.random() * 3 + 1;
-            }
-            
-            sparkleGeometry = new THREE.BufferGeometry();
-            sparkleGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-            sparkleGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-            sparkleGeometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
-            
-            sparkleMaterial = new THREE.ShaderMaterial({
-                uniforms: {
-                    time: { value: 0.0 }
-                },
-                vertexShader: `
-                    attribute float size;
-                    attribute vec3 color;
-                    varying vec3 vColor;
-                    uniform float time;
-                    
-                    void main() {
-                        vColor = color;
-                        vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-                        float sparkle = sin(time * 3.0 + position.x * 10.0) * 0.5 + 0.5;
-                        gl_PointSize = size * (sparkle * 2.0 + 1.0) * (300.0 / -mvPosition.z);
-                        gl_Position = projectionMatrix * mvPosition;
-                    }
-                `,
-                fragmentShader: `
-                    varying vec3 vColor;
-                    
-                    void main() {
-                        float dist = distance(gl_PointCoord, vec2(0.5));
-                        if (dist > 0.5) discard;
-                        float alpha = (1.0 - dist * 2.0) * (1.0 - dist * 2.0);
-                        gl_FragColor = vec4(vColor, alpha);
-                    }
-                `,
-                blending: THREE.AdditiveBlending,
-                transparent: true
-            });
-            
-            sparklePoints = new THREE.Points(sparkleGeometry, sparkleMaterial);
-            scene.add(sparklePoints);
-        }
-        
-        function createGlowEffect() {
-            // Crear halo de brillo alrededor del modelo
-            const glowGeometry = new THREE.SphereGeometry(3, 32, 32);
-            const glowMaterial = new THREE.ShaderMaterial({
-                uniforms: {
-                    time: { value: 0.0 },
-                    color: { value: new THREE.Color(0xffd700) }
-                },
-                vertexShader: `
-                    varying vec3 vNormal;
-                    varying vec3 vPosition;
-                    uniform float time;
-                    
-                    void main() {
-                        vNormal = normalize(normalMatrix * normal);
-                        vPosition = position;
-                        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-                    }
-                `,
-                fragmentShader: `
-                    uniform float time;
-                    uniform vec3 color;
-                    varying vec3 vNormal;
-                    varying vec3 vPosition;
-                    
-                    void main() {
-                        float intensity = pow(0.4 - dot(vNormal, vec3(0.0, 0.0, 1.0)), 2.0);
-                        float pulse = sin(time * 2.0) * 0.1 + 0.9;
-                        gl_FragColor = vec4(color, intensity * 0.3 * pulse);
-                    }
-                `,
-                side: THREE.BackSide,
-                blending: THREE.AdditiveBlending,
-                transparent: true
-            });
-            
-            glowSphere = new THREE.Mesh(glowGeometry, glowMaterial);
-            scene.add(glowSphere);
-        }
-        
         function animate() {
             requestAnimationFrame(animate);
-            
-            const time = Date.now() * 0.001;
 
             if (model) {
                 model.rotation.y += rotationVelocityY;
@@ -436,24 +256,6 @@
                 // Suavizar inercia
                 rotationVelocityX *= 0.95;
                 rotationVelocityY *= 0.95;
-            }
-            
-            // Animar partículas de destello
-            if (sparkleMaterial) {
-                sparkleMaterial.uniforms.time.value = time;
-            }
-            
-            // Animar halo de brillo
-            if (glowSphere) {
-                glowSphere.material.uniforms.time.value = time;
-                glowSphere.rotation.y = time * 0.5;
-                glowSphere.rotation.x = time * 0.3;
-            }
-            
-            // Animar las luces para crear destellos dinámicos
-            const keyLight = scene.children.find(child => child instanceof THREE.PointLight && child.color.r === 1);
-            if (keyLight) {
-                keyLight.intensity = 3 + Math.sin(time * 2) * 0.5;
             }
 
             renderer.render(scene, camera);
