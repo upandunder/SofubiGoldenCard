@@ -55,6 +55,7 @@
             touch-action: none; /* Importante para evitar comportamientos no deseados en móviles */
         }
     </style>
+    
 </head>
 <body>
     <script type="importmap">
@@ -69,6 +70,7 @@
     <script type="module">
         import * as THREE from 'three';
         import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+        import { DecalGeometry } from 'three/addons/geometries/DecalGeometry.js';
         
         let scene, camera, renderer, model;
 
@@ -77,6 +79,88 @@
         let previousPosition = { x: 0, y: 0 };
         let rotationVelocityX = 0;
         let rotationVelocityY = 0;
+        let hasUserInteracted = false;
+
+        // Crea una textura de canvas con texto en negro y fondo transparente
+        function createTextTexture(text) {
+            const width = 1024;
+            const height = 256;
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+
+            ctx.clearRect(0, 0, width, height);
+            ctx.fillStyle = 'rgba(0,0,0,1)';
+
+            // Ajuste de tipografía y escalado para ocupar el canvas
+            const padding = 40;
+            const fontFamily = 'Arial, Helvetica, sans-serif';
+            let fontSize = height - padding * 2; // tamaño base
+            ctx.font = `bold ${fontSize}px ${fontFamily}`;
+
+            // Reducir si el texto se sale del ancho
+            let metrics = ctx.measureText(text);
+            if (metrics.width > width - padding * 2) {
+                const scale = (width - padding * 2) / metrics.width;
+                fontSize = Math.floor(fontSize * scale);
+                ctx.font = `bold ${fontSize}px ${fontFamily}`;
+                metrics = ctx.measureText(text);
+            }
+
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(text, width / 2, height / 2 + fontSize * 0.1);
+
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.anisotropy = 8;
+            texture.needsUpdate = true;
+            return texture;
+        }
+
+        // Proyecta un decal con el texto sobre la superficie del modelo
+        function projectTextDecal(targetText) {
+            if (!model) return;
+
+            const raycaster = new THREE.Raycaster();
+            const origin = camera.position.clone();
+            const target = new THREE.Vector3(0, 0, 0); // el modelo ya está centrado
+            const direction = target.clone().sub(origin).normalize();
+
+            raycaster.set(origin, direction);
+            const intersects = raycaster.intersectObject(model, true);
+            if (!intersects.length) return;
+
+            const hit = intersects[0];
+            const hitPoint = hit.point.clone();
+            const hitNormal = hit.face.normal.clone().transformDirection(hit.object.matrixWorld).normalize();
+
+            const orientation = new THREE.Euler();
+            const quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), hitNormal);
+            orientation.setFromQuaternion(quat);
+
+            const size = new THREE.Vector3(1.6, 0.45, 0.2); // ancho, alto, profundidad del decal
+
+            const decalGeometry = new DecalGeometry(hit.object, hitPoint, orientation, size);
+
+            const textTexture = createTextTexture(targetText);
+            const decalMaterial = new THREE.MeshStandardMaterial({
+                map: textTexture,
+                transparent: true,
+                color: 0xffffff,
+                metalness: 0,
+                roughness: 1,
+                depthTest: true,
+                depthWrite: false,
+                polygonOffset: true,
+                polygonOffsetFactor: -4
+            });
+
+            const decalMesh = new THREE.Mesh(decalGeometry, decalMaterial);
+            decalMesh.renderOrder = 1; // asegúrate que se dibuje encima
+            // Agregar el decal como hijo del modelo para que se mueva/rote junto con él
+            model.add(decalMesh);
+        }
         
         function init() {
             // Scene
@@ -145,6 +229,7 @@
             function handleStart(event) {
                 event.preventDefault();
                 isDragging = true;
+                hasUserInteracted = true;
                 const pos = getEventPosition(event);
                 previousPosition.x = pos.x;
                 previousPosition.y = pos.y;
@@ -222,6 +307,9 @@
                     
                     scene.add(model);
                     console.log('Model added to scene with gold material');
+
+                    // Proyectar texto "KAIJU" en el primer plano visible del modelo
+                    projectTextDecal('texto de prueba');
                 },
                 function(progress) {
                     console.log('Loading progress: ', (progress.loaded / progress.total * 100) + '%');
@@ -250,7 +338,9 @@
             requestAnimationFrame(animate);
 
             if (model) {
-                model.rotation.y += rotationVelocityY;
+                // Rotación automática solo hasta la primera interacción + inercia de arrastre
+                const autoRotate = hasUserInteracted ? 0 : 0.05;
+                model.rotation.y += autoRotate + rotationVelocityY;
                 model.rotation.x += rotationVelocityX;
 
                 // Suavizar inercia
