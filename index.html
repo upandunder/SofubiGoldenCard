@@ -371,7 +371,7 @@
                     const fixedFontSize = 300; // Tamaño consistente para todas las letras
                     const decalHeight = 0.45; // Altura consistente para todos los decals
                     
-                    projectTextDecal('Patricio loyola r', { x: 59, y: 69, z: 50 }, '#343419', fixedFontSize, decalHeight);
+                    projectTextDecal('PATRICIO LOYOLA R', { x: 59, y: 69, z: 50 }, '#343419', fixedFontSize, decalHeight);
                     projectTextDecal('24-08-2025', { x: 59, y: 20, z: 50 }, '#343419', fixedFontSize, decalHeight);
                     projectTextDecal('KUERORO', { x: 59, y: -33, z: 50 }, '#343419', fixedFontSize, decalHeight);
                     projectTextDecal('STANDAR', { x: 59, y: -86, z: 50 }, '#343419', fixedFontSize, decalHeight);
@@ -410,7 +410,7 @@
 
             if (model) {
                 // Rotación automática solo hasta la primera interacción + inercia de arrastre
-                const autoRotate = hasUserInteracted ? 0 : 0.05;
+                const autoRotate = hasUserInteracted ? 0 : 0.02;
                 model.rotation.y += autoRotate + rotationVelocityY;
                 model.rotation.x += rotationVelocityX;
 
