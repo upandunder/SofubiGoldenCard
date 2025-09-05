@@ -1,122 +1,786 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Tarjeta 3D - Kaiju</title>
-  <style>
-    body { margin: 0; background: black; overflow: hidden; }
-    canvas { display: block; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enhanced 3D Card Viewer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body, html {
+            height: 100%;
+            overflow: hidden;
+            touch-action: none;
+            font-family: 'Century Gothic', sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(45deg, #0a0a0a, #1a1a2e, #16213e, #0f3460);
+            background-size: 400% 400%;
+            animation: gradientShift 15s ease infinite;
+            position: relative;
+        }
+        
+        body::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(ellipse at center top, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.08) 30%, rgba(255, 255, 255, 0.02) 60%, transparent 100%);
+            pointer-events: none;
+        }
+        
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+            touch-action: none;
+        }
+        
+        #loadingOverlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(45deg, #0a0a0a, #1a1a2e);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            transition: opacity 0.5s ease;
+        }
+        
+        #loadingProgress {
+            color: #ffffff;
+            font-size: 48px;
+            font-weight: bold;
+            text-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
+            margin-bottom: 20px;
+        }
+        
+        #loadingStatus {
+            color: #cccccc;
+            font-size: 18px;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        
+        #controls {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .control-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+            font-family: inherit;
+            font-size: 14px;
+        }
+        
+        .control-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+        }
+        
+        .control-btn:active {
+            transform: translateY(0);
+        }
+        
+        #cardInfo {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 20px;
+            border-radius: 15px;
+            backdrop-filter: blur(15px);
+            border: 1px solid rgba(212, 175, 55, 0.3);
+            font-size: 14px;
+            max-width: 350px;
+            opacity: 0;
+            transform: translateY(30px);
+            transition: all 0.5s ease;
+            z-index: 100;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+        
+        #cardInfo.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        
+        #cardInfo h3 {
+            color: #d4af37;
+            margin-bottom: 15px;
+            font-size: 18px;
+            text-shadow: 0 0 10px rgba(212, 175, 55, 0.3);
+        }
+        
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            padding: 5px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .info-label {
+            color: #cccccc;
+            font-weight: bold;
+        }
+        
+        .info-value {
+            color: #ffffff;
+            text-align: right;
+        }
+        
+        .error-message {
+            color: #ff6b6b;
+            text-align: center;
+            padding: 15px;
+            background: rgba(255, 107, 107, 0.1);
+            border-radius: 10px;
+            border: 1px solid rgba(255, 107, 107, 0.3);
+            margin-top: 15px;
+        }
+        
+        #urlInput {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 100;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        #cardIdInput {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 8px;
+            backdrop-filter: blur(10px);
+            font-family: inherit;
+            font-size: 14px;
+            width: 150px;
+        }
+        
+        #cardIdInput::placeholder {
+            color: rgba(255, 255, 255, 0.5);
+        }
+        
+        #cardIdInput:focus {
+            outline: none;
+            border-color: #d4af37;
+            box-shadow: 0 0 10px rgba(212, 175, 55, 0.3);
+        }
+        
+        .golden-glow {
+            text-shadow: 0 0 10px rgba(212, 175, 55, 0.5);
+        }
+    </style>
 </head>
 <body>
-<script type="module">
-  import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.module.js';
-  import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/controls/OrbitControls.js';
-  import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/loaders/GLTFLoader.js';
-  import { FontLoader } from 'https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/loaders/FontLoader.js';
-  import { TextGeometry } from 'https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/geometries/TextGeometry.js';
+    <div id="loadingOverlay">
+        <div id="loadingProgress">0%</div>
+        <div id="loadingStatus">Initializing...</div>
+    </div>
+    
+    <div id="urlInput">
+        <input type="text" id="cardIdInput" placeholder="Enter Card ID" />
+        <button class="control-btn" onclick="loadCardById()">Load Card</button>
+    </div>
+    
+    <div id="controls">
+        <button class="control-btn" onclick="resetView()">Reset View</button>
+        <button class="control-btn" onclick="toggleAutoRotate()">Toggle Rotation</button>
+        <button class="control-btn" onclick="toggleCardInfo()">Card Info</button>
+        <button class="control-btn" onclick="shareCard()">Share Card</button>
+    </div>
+    
+    <div id="cardInfo">
+        <h3 class="golden-glow">Card Information</h3>
+        <div id="cardData">
+            <div class="info-row">
+                <span class="info-label">Owner:</span>
+                <span class="info-value" id="owner">Loading...</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Date:</span>
+                <span class="info-value" id="date">Loading...</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Model:</span>
+                <span class="info-value" id="model">Loading...</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Type:</span>
+                <span class="info-value" id="type">Loading...</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Description:</span>
+                <span class="info-value" id="description">Loading...</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Edition:</span>
+                <span class="info-value golden-glow" id="edition">Loading...</span>
+            </div>
+        </div>
+    </div>
 
-  let scene, camera, renderer, controls, model, font, cardData = {};
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.skypack.dev/three@0.132.2",
+            "three/addons/": "https://cdn.skypack.dev/three@0.132.2/examples/jsm/"
+        }
+    }
+    </script>
+    
+    <script type="module">
+        import * as THREE from 'three';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+        import { DecalGeometry } from 'three/addons/geometries/DecalGeometry.js';
+        
+        // Global variables
+        let scene, camera, renderer, model;
+        let isDragging = false;
+        let previousPosition = { x: 0, y: 0 };
+        let rotationVelocityX = 0;
+        let rotationVelocityY = 0;
+        let hasUserInteracted = false;
+        let autoRotateEnabled = true;
+        let cardInfoVisible = false;
+        
+        // DOM elements
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const loadingProgress = document.getElementById('loadingProgress');
+        const loadingStatus = document.getElementById('loadingStatus');
+        const cardInfo = document.getElementById('cardInfo');
+        const cardIdInput = document.getElementById('cardIdInput');
+        
+        // API configuration
+        const API_BASE_URL = 'https://script.google.com/macros/s/AKfycbwnMnhCzbzGqAy4cmM0Bp-cccwV98qOhZu16qokGiacM-1-bij5b5TX5VhpLbWFEzEP/exec';
+        
+        // Current card data
+        let currentCardData = {
+            ID: '',
+            'NFC Link': '',
+            Comprador: 'Patricio Loyola R',
+            Fecha: '24-08-2025',
+            Modelo: 'KUERORO',
+            Tipo: 'STANDARD',
+            Descripcion: 'CHILEAN MYTHICAL KAIJU',
+            Edicion: '1/250'
+        };
 
-  // ======== INICIO ESCENA ==========
-  function init() {
-    scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x000000);
+        // Get card ID from URL parameter
+        function getCardIdFromUrl() {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get('id') || window.location.pathname.split('/').pop() || '';
+        }
 
-    camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 1000);
-    camera.position.set(0, 0, 120);
+        // Load card data from API
+        async function loadCardData(cardId) {
+            if (!cardId) return currentCardData;
+            
+            updateLoadingStatus('Loading card data...');
+            
+            try {
+                const response = await fetch(`${API_BASE_URL}?id=${encodeURIComponent(cardId)}`);
+                const data = await response.json();
+                
+                if (data.error) {
+                    console.warn(`Card ID ${cardId} not found, using default data`);
+                    showError(`Card ID "${cardId}" not found. Showing default card.`);
+                    return currentCardData;
+                }
+                
+                return data;
+            } catch (error) {
+                console.error('Error loading card data:', error);
+                showError('Failed to load card data. Showing default card.');
+                return currentCardData;
+            }
+        }
 
-    renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    document.body.appendChild(renderer.domElement);
+        // Update loading status
+        function updateLoadingStatus(message) {
+            loadingStatus.textContent = message;
+        }
 
-    controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-    controls.enableZoom = false;
+        // Show error message
+        function showError(message) {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error-message';
+            errorDiv.textContent = message;
+            document.getElementById('cardData').appendChild(errorDiv);
+            
+            setTimeout(() => {
+                errorDiv.remove();
+            }, 5000);
+        }
 
-    const ambientLight = new THREE.AmbientLight(0xffffff, 1);
-    scene.add(ambientLight);
-    const dirLight = new THREE.DirectionalLight(0xffffff, 1);
-    dirLight.position.set(5, 10, 7);
-    scene.add(dirLight);
+        // Update card info display
+        function updateCardInfo(data) {
+            document.getElementById('owner').textContent = data.Comprador || 'Unknown';
+            document.getElementById('date').textContent = data.Fecha || 'Unknown';
+            document.getElementById('model').textContent = data.Modelo || 'Unknown';
+            document.getElementById('type').textContent = data.Tipo || 'Unknown';
+            document.getElementById('description').textContent = data.Descripcion || 'Unknown';
+            document.getElementById('edition').textContent = data.Edicion || 'Unknown';
+        }
 
-    loadModel();
+        // Enhanced text texture creation
+        function createTextTexture(text, color = '#ffffff', fixedFontSize = null) {
+            const baseHeight = 2048;
+            const padding = 120;
+            const fontFamily = 'Century Gothic, Arial, sans-serif';
+            
+            let fontSize = fixedFontSize || 600;
+            
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCtx.font = `bold ${fontSize}px ${fontFamily}`;
+            const metrics = tempCtx.measureText(text);
+            
+            const textWidth = metrics.width;
+            const canvasWidth = Math.max(textWidth + padding * 2, baseHeight);
+            const canvasHeight = baseHeight;
+            
+            const canvas = document.createElement('canvas');
+            canvas.width = canvasWidth;
+            canvas.height = canvasHeight;
+            const ctx = canvas.getContext('2d');
 
-    window.addEventListener('resize', onWindowResize, false);
-    animate();
-  }
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            
+            ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+            
+            // Enhanced text rendering with glow effect
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+            ctx.shadowBlur = 8;
+            ctx.shadowOffsetX = 3;
+            ctx.shadowOffsetY = 3;
+            
+            ctx.fillStyle = color;
+            ctx.font = `bold ${fontSize}px ${fontFamily}`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(text, canvasWidth / 2, canvasHeight / 2 + fontSize * 0.1);
 
-  function onWindowResize() {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-  }
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.anisotropy = Math.min(16, renderer ? renderer.capabilities.getMaxAnisotropy() : 16);
+            texture.needsUpdate = true;
+            
+            return {
+                texture: texture,
+                aspectRatio: canvasWidth / canvasHeight,
+                width: canvasWidth,
+                height: canvasHeight
+            };
+        }
 
-  function animate() {
-    requestAnimationFrame(animate);
-    if (model) model.rotation.y += 0.005;
-    controls.update();
-    renderer.render(scene, camera);
-  }
+        // Project text decal onto model
+        function projectTextDecal(targetText, positionMM = null, textColor = '#000000', fontSize = null, baseDecalHeight = 0.45) {
+            if (!model || !targetText) return;
 
-  // ======== CARGAR MODELO Y TEXTO ==========
-  function loadModel() {
-    const loader = new GLTFLoader();
-    loader.load('tarjeta.glb', (gltf) => {
-      model = gltf.scene;
-      scene.add(model);
+            const scaleToScene = 0.01;
+            let hitPoint, hitNormal, targetMesh;
 
-      const fontLoader = new FontLoader();
-      fontLoader.load('https://threejs.org/examples/fonts/helvetiker_regular.typeface.json', (loadedFont) => {
-        font = loadedFont;
-        addTextDecals(cardData || {}); // aquí ya inyectamos los datos dinámicos
-      });
-    });
-  }
+            if (positionMM) {
+                hitPoint = new THREE.Vector3(
+                    positionMM.x * scaleToScene,
+                    positionMM.y * scaleToScene, 
+                    positionMM.z * scaleToScene
+                );
+                
+                const rayOrigin = hitPoint.clone().add(new THREE.Vector3(0, 0, 2));
+                const rayDirection = new THREE.Vector3(0, 0, -1);
+                
+                const raycaster = new THREE.Raycaster();
+                raycaster.set(rayOrigin, rayDirection);
+                const intersects = raycaster.intersectObject(model, true);
+                
+                if (intersects.length > 0) {
+                    const hit = intersects[0];
+                    hitPoint = hit.point.clone();
+                    hitNormal = hit.face.normal.clone().transformDirection(hit.object.matrixWorld).normalize();
+                    targetMesh = hit.object;
+                    
+                    if (hitNormal.z < 0) {
+                        hitNormal.negate();
+                    }
+                } else {
+                    hitNormal = new THREE.Vector3(0, 0, 1);
+                    model.traverse((child) => {
+                        if (child.isMesh && !targetMesh) {
+                            targetMesh = child;
+                        }
+                    });
+                }
+            }
 
-  function projectTextDecal(text, position, color, size, height) {
-    if (!font) return;
-    const geometry = new TextGeometry(text, {
-      font: font,
-      size: size / 1000,
-      height: height,
-      curveSegments: 12,
-      bevelEnabled: false
-    });
-    const material = new THREE.MeshStandardMaterial({ color });
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.position.set(position.x, position.y, position.z);
-    mesh.rotation.y = Math.PI; // texto mirando hacia adelante
-    model.add(mesh);
-  }
+            if (!targetMesh) return;
 
-  function addTextDecals(data) {
-    const fixedFontSize = 500;
-    const decalHeight = 0.45;
+            const orientation = new THREE.Euler();
+            const quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), hitNormal);
+            orientation.setFromQuaternion(quat);
 
-    projectTextDecal(data.buyer || "Desconocido", { x: 59, y: 69, z: 50 }, '#FFFFFF', fixedFontSize, decalHeight);
-    projectTextDecal(data.date || "Fecha", { x: 59, y: 20, z: 50 }, '#FFFFFF', fixedFontSize, decalHeight);
-    projectTextDecal(data.figure || "Figura", { x: 59, y: -33, z: 50 }, '#FFFFFF', fixedFontSize, decalHeight);
-    projectTextDecal(data.version || "Versión", { x: 59, y: -86, z: 50 }, '#FFFFFF', fixedFontSize, decalHeight);
-    projectTextDecal(data.series_name || "Serie", { x: 59, y: -138, z: 50 }, '#FFFFFF', 350, decalHeight);
-    projectTextDecal(data.figure_number || "0/0", { x: 6, y: -230, z: 50 }, '#FFFFFF', 1000, decalHeight);
-  }
+            const textData = createTextTexture(targetText, textColor, fontSize || 600);
+            const decalHeight = baseDecalHeight;
+            const decalWidth = decalHeight * textData.aspectRatio;
+            const size = new THREE.Vector3(decalWidth, decalHeight, 0.2);
 
-  // ======== CARGA DE DATOS DESDE GOOGLE SHEETS ==========
-  const params = new URLSearchParams(window.location.search);
-  const id = params.get("id");
-  const apiUrl = "https://script.google.com/macros/s/AKfycbwnMnhCzbzGqAy4cmM0Bp-cccwV98qOhZu16qokGiacM-1-bij5b5TX5VhpLbWFEzEP/exec" + id;
+            const decalGeometry = new DecalGeometry(targetMesh, hitPoint, orientation, size);
 
-  fetch(apiUrl)
-    .then(res => res.json())
-    .then(data => {
-      cardData = data;
-      init(); // solo inicializamos cuando tenemos datos
-    })
-    .catch(err => {
-      console.error("Error cargando datos", err);
-      init(); // iniciamos igual con textos por defecto
-    });
-</script>
-</body>
-</html>
+            const decalMaterial = new THREE.MeshStandardMaterial({
+                map: textData.texture,
+                transparent: true,
+                color: 0xffffff,
+                metalness: 0.1,
+                roughness: 0.8,
+                depthTest: true,
+                depthWrite: false,
+                polygonOffset: true,
+                polygonOffsetFactor: -4
+            });
+
+            const decalMesh = new THREE.Mesh(decalGeometry, decalMaterial);
+            decalMesh.renderOrder = 1;
+            model.add(decalMesh);
+        }
+        
+        // Initialize Three.js scene
+        function init() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 0, 4);
+            
+            renderer = new THREE.WebGLRenderer({ 
+                antialias: true, 
+                alpha: true,
+                powerPreference: "high-performance"
+            });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.setClearColor(0x000000, 0);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1.0;
+            document.body.appendChild(renderer.domElement);
+            
+            // Enhanced lighting setup
+            const ambientLight = new THREE.AmbientLight(0x404040, 0.6);
+            scene.add(ambientLight);
+            
+            const mainLight = new THREE.DirectionalLight(0xffffff, 1.2);
+            mainLight.position.set(0, 10, 5);
+            mainLight.castShadow = true;
+            mainLight.shadow.mapSize.width = 2048;
+            mainLight.shadow.mapSize.height = 2048;
+            scene.add(mainLight);
+            
+            const fillLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.8);
+            scene.add(fillLight);
+            
+            // Add golden rim light
+            const rimLight = new THREE.DirectionalLight(0xd4af37, 0.5);
+            rimLight.position.set(-5, 0, 2);
+            scene.add(rimLight);
+            
+            // Environment map
+            const envLoader = new THREE.CubeTextureLoader();
+            const envMap = envLoader.load([
+                'https://threejs.org/examples/textures/cube/SwedishRoyalCastle/px.jpg',
+                'https://threejs.org/examples/textures/cube/SwedishRoyalCastle/nx.jpg',
+                'https://threejs.org/examples/textures/cube/SwedishRoyalCastle/py.jpg',
+                'https://threejs.org/examples/textures/cube/SwedishRoyalCastle/ny.jpg',
+                'https://threejs.org/examples/textures/cube/SwedishRoyalCastle/pz.jpg',
+                'https://threejs.org/examples/textures/cube/SwedishRoyalCastle/nz.jpg'
+            ]);
+            scene.environment = envMap;
+            
+            setupEventListeners();
+            animate();
+        }
+        
+        // Setup event listeners
+        function setupEventListeners() {
+            function getEventPosition(event) {
+                if (event.touches && event.touches.length > 0) {
+                    return { x: event.touches[0].clientX, y: event.touches[0].clientY };
+                }
+                return { x: event.clientX, y: event.clientY };
+            }
+            
+            function handleStart(event) {
+                event.preventDefault();
+                isDragging = true;
+                hasUserInteracted = true;
+                const pos = getEventPosition(event);
+                previousPosition.x = pos.x;
+                previousPosition.y = pos.y;
+            }
+            
+            function handleMove(event) {
+                if (isDragging && model) {
+                    event.preventDefault();
+                    const pos = getEventPosition(event);
+                    const deltaX = pos.x - previousPosition.x;
+                    const deltaY = pos.y - previousPosition.y;
+
+                    rotationVelocityY = deltaX * 0.005;
+                    rotationVelocityX = deltaY * 0.0025;
+
+                    previousPosition.x = pos.x;
+                    previousPosition.y = pos.y;
+                }
+            }
+            
+            function handleEnd(event) {
+                event.preventDefault();
+                isDragging = false;
+            }
+            
+            const canvas = renderer.domElement;
+            canvas.addEventListener('mousedown', handleStart);
+            canvas.addEventListener('mousemove', handleMove);
+            canvas.addEventListener('mouseup', handleEnd);
+            canvas.addEventListener('mouseleave', handleEnd);
+            canvas.addEventListener('touchstart', handleStart, { passive: false });
+            canvas.addEventListener('touchmove', handleMove, { passive: false });
+            canvas.addEventListener('touchend', handleEnd, { passive: false });
+            canvas.addEventListener('touchcancel', handleEnd, { passive: false });
+            
+            // Keyboard shortcuts
+            window.addEventListener('keydown', (event) => {
+                switch(event.key) {
+                    case 'r':
+                    case 'R':
+                        resetView();
+                        break;
+                    case 'i':
+                    case 'I':
+                        toggleCardInfo();
+                        break;
+                    case ' ':
+                        event.preventDefault();
+                        toggleAutoRotate();
+                        break;
+                }
+            });
+            
+            window.addEventListener('resize', onWindowResize, false);
+            
+            // Input field enter key
+            cardIdInput.addEventListener('keypress', (event) => {
+                if (event.key === 'Enter') {
+                    loadCardById();
+                }
+            });
+        }
+        
+        // Load 3D model
+        async function loadModel() {
+            const loader = new GLTFLoader();
+            
+            updateLoadingStatus('Loading 3D model...');
+            
+            loader.load(
+                'https://raw.githubusercontent.com/upandunder/paso-a-paso/main/tarjeta%20sofubi%20v66.glb',
+                function(gltf) {
+                    model = gltf.scene;
+                    
+                    // Enhanced gold material
+                    const goldMaterial = new THREE.MeshStandardMaterial({
+                        color: 0xd4af37,
+                        metalness: 0.9,
+                        roughness: 0.1,
+                        envMapIntensity: 2.0,
+                        emissive: 0x221100,
+                        emissiveIntensity: 0.1
+                    });
+                    
+                    model.traverse((child) => {
+                        if (child.isMesh) {
+                            child.material = goldMaterial;
+                            child.castShadow = true;
+                            child.receiveShadow = true;
+                        }
+                    });
+                    
+                    // Center and scale model
+                    const box = new THREE.Box3().setFromObject(model);
+                    const center = box.getCenter(new THREE.Vector3());
+                    model.position.sub(center);
+                    
+                    const size = box.getSize(new THREE.Vector3());
+                    const maxDim = Math.max(size.x, size.y, size.z);
+                    const scale = 4 / maxDim;
+                    model.scale.setScalar(scale);
+                    
+                    scene.add(model);
+                    
+                    // Add text decals with current card data
+                    addTextDecals();
+                    
+                    // Hide loading overlay
+                    setTimeout(() => {
+                        loadingOverlay.style.opacity = '0';
+                        setTimeout(() => {
+                            loadingOverlay.style.display = 'none';
+                        }, 500);
+                    }, 1000);
+                },
+                function(progress) {
+                    const percentage = Math.round((progress.loaded / progress.total) * 100);
+                    loadingProgress.textContent = percentage + '%';
+                },
+                function(error) {
+                    console.error('Error loading model: ', error);
+                    createFallbackModel();
+                    loadingOverlay.style.display = 'none';
+                }
+            );
+        }
+        
+        // Add text decals to the model
+        function addTextDecals() {
+            if (!model || !currentCardData) return;
+            
+            // Clear existing decals
+            const decalsToRemove = [];
+            model.traverse((child) => {
+                if (child.isMesh && child.renderOrder === 1) {
+                    decalsToRemove.push(child);
+                }
+            });
+            decalsToRemove.forEach(decal => model.remove(decal));
+            
+            const fixedFontSize = 500;
+            const decalHeight = 0.45;
+            
+            // Add decals with current card data
+            projectTextDecal(currentCardData.Comprador || 'Unknown Owner', { x: 59, y: 69, z: 50 }, '#FFFFFF', fixedFontSize, decalHeight);
+            projectTextDecal(currentCardData.Fecha || 'Unknown Date', { x: 59, y: 20, z: 50 }, '#FFFFFF', fixedFontSize, decalHeight);
+            projectTextDecal(currentCardData.Modelo || 'Unknown Model', { x: 59, y: -33, z: 50 }, '#FFFFFF', fixedFontSize, decalHeight);
+            projectTextDecal(currentCardData.Tipo || 'Unknown Type', { x: 59, y: -86, z: 50 }, '#FFFFFF', fixedFontSize, decalHeight);
+            projectTextDecal(currentCardData.Descripcion || 'Unknown Description', { x: 59, y: -138, z: 50 }, '#FFFFFF', 350, decalHeight);
+            projectTextDecal(currentCardData.Edicion || 'Unknown Edition', { x: 6, y: -230, z: 50 }, '#FFFFFF', 1000, decalHeight);
+        }
+        
+        // Create fallback model if main model fails to load
+        function createFallbackModel() {
+            const geometry = new THREE.BoxGeometry(3, 4, 0.2);
+            const material = new THREE.MeshStandardMaterial({ 
+                color: 0xd4af37,
+                metalness: 0.8,
+                roughness: 0.2
+            });
+            model = new THREE.Mesh(geometry, material);
+            scene.add(model);
+            addTextDecals();
+        }
+        
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+
+            if (model) {
+                const autoRotate = (autoRotateEnabled && !hasUserInteracted) ? 0.01 : 0;
+                model.rotation.y += autoRotate + rotationVelocityY;
+                model.rotation.x += rotationVelocityX;
+
+                rotationVelocityX *= 0.95;
+                rotationVelocityY *= 0.95;
+            }
+
+            renderer.render(scene, camera);
+        }
+        
+        // Handle window resize
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+        
+        // Global functions for UI controls
+        window.resetView = function() {
+            if (model) {
+                model.rotation.set(0, 0, 0);
+                rotationVelocityX = 0;
+                rotationVelocityY = 0;
+            }
+            camera.position.set(0, 0, 4);
+            hasUserInteracted = false;
+        };
+        
+        window.toggleAutoRotate = function() {
+            autoRotateEnabled = !autoRotateEnabled;
+            if (!autoRotateEnabled) {
+                hasUserInteracted = true;
+            }
+        };
+        
+        window.toggleCardInfo = function() {
+            cardInfoVisible = !cardInfoVisible;
+            if (cardInfoVisible) {
+                cardInfo.classList.add('visible');
+            } else {
+                cardInfo.classList.remove('visible');
+            }
+        };
+        
+        window.loadCardById = async function() {
+            const cardId = cardIdInput.value.trim();
+            if (!cardId) return;
+            
+            updateLoadingStatus('Loading card data...');
+            loadingOverlay.style.display = 'flex';
+            loadingOverlay.style.opacity = '1';
+            
+            try {
+                currentCardData = await loadCardData(cardId);
+                updateCardInfo(currentCardData);
+                addTextDecals(); // Refresh the 3D model with new data
+                
+                // Update URL without refreshing the page
+                const newUrl = new URL(window.location);
+                newUrl.searchParams.set('id', cardId);
+                window.history.replaceState({}, '', newUrl);
+                
+            } catch (error) {
+                console.error('Error loading card:', error);
+                showError('Failed to load card data.');
