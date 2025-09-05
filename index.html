@@ -1,435 +1,122 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dark Gradient Background</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body, html {
-            height: 100%;
-            overflow: hidden;
-            touch-action: none; /* Previene el scroll en móviles */
-        }
-        
-        body {
-            background: linear-gradient(45deg, #0a0a0a, #1a1a2e, #16213e, #0f3460);
-            background-size: 400% 400%;
-            animation: gradientShift 15s ease infinite;
-            position: relative;
-        }
-        
-        body::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: radial-gradient(ellipse at center top, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.08) 30%, rgba(255, 255, 255, 0.02) 60%, transparent 100%);
-            pointer-events: none;
-        }
-        
-        @keyframes gradientShift {
-            0% {
-                background-position: 0% 50%;
-            }
-            50% {
-                background-position: 100% 50%;
-            }
-            100% {
-                background-position: 0% 50%;
-            }
-        }
-        
-        canvas {
-            position: absolute;
-            top: 0;
-            left: 0;
-            z-index: 1;
-            touch-action: none; /* Importante para evitar comportamientos no deseados en móviles */
-        }
-    </style>
-    
+  <meta charset="UTF-8">
+  <title>Tarjeta 3D - Kaiju</title>
+  <style>
+    body { margin: 0; background: black; overflow: hidden; }
+    canvas { display: block; }
+  </style>
 </head>
 <body>
-    <script type="importmap">
-    {
-        "imports": {
-            "three": "https://cdn.skypack.dev/three@0.132.2",
-            "three/addons/": "https://cdn.skypack.dev/three@0.132.2/examples/jsm/"
-        }
-    }
-    </script>
-    
-    <script type="module">
-        import * as THREE from 'three';
-        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-        import { DecalGeometry } from 'three/addons/geometries/DecalGeometry.js';
-        
-        let scene, camera, renderer, model;
+<script type="module">
+  import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.module.js';
+  import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/controls/OrbitControls.js';
+  import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/loaders/GLTFLoader.js';
+  import { FontLoader } from 'https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/loaders/FontLoader.js';
+  import { TextGeometry } from 'https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/geometries/TextGeometry.js';
 
-        // Variables para rotación con inercia
-        let isDragging = false;
-        let previousPosition = { x: 0, y: 0 };
-        let rotationVelocityX = 0;
-        let rotationVelocityY = 0;
-        let hasUserInteracted = false;
+  let scene, camera, renderer, controls, model, font, cardData = {};
 
-        // Crea una textura de canvas con texto y color personalizable - VERSIÓN MEJORADA
-        function createTextTexture(text, color = '#ffffff', fixedFontSize = null) {
-            // Usar un tamaño fijo de canvas que mantenga proporción 1:1 para caracteres
-            const baseHeight = 512;
-            const padding = 40;
-            const fontFamily = 'Century Gothic';
-            
-            // Definir tamaño de fuente fijo
-            let fontSize = fixedFontSize || 200;
-            
-            // Crear canvas temporal para medir el texto
-            const tempCanvas = document.createElement('canvas');
-            const tempCtx = tempCanvas.getContext('2d');
-            tempCtx.font = `bold ${fontSize}px ${fontFamily}`;
-            const metrics = tempCtx.measureText(text);
-            
-            // Calcular el ancho necesario basado en el texto real
-            const textWidth = metrics.width;
-            const canvasWidth = Math.max(textWidth + padding * 2, baseHeight); // Mínimo cuadrado
-            const canvasHeight = baseHeight;
-            
-            // Crear el canvas final con el tamaño correcto
-            const canvas = document.createElement('canvas');
-            canvas.width = canvasWidth;
-            canvas.height = canvasHeight;
-            const ctx = canvas.getContext('2d');
+  // ======== INICIO ESCENA ==========
+  function init() {
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x000000);
 
-            ctx.clearRect(0, 0, canvasWidth, canvasHeight);
-            ctx.fillStyle = color;
-            ctx.font = `bold ${fontSize}px ${fontFamily}`;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(text, canvasWidth / 2, canvasHeight / 2 + fontSize * 0.1);
+    camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 1000);
+    camera.position.set(0, 0, 120);
 
-            const texture = new THREE.CanvasTexture(canvas);
-            texture.anisotropy = 16;
-            texture.needsUpdate = true;
-            
-            // Devolver tanto la textura como las dimensiones del canvas para calcular proporción
-            return {
-                texture: texture,
-                aspectRatio: canvasWidth / canvasHeight,
-                width: canvasWidth,
-                height: canvasHeight
-            };
-        }
+    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
 
-        // Versión mejorada de projectTextDecal con control de tamaño y proporción correcta
-        function projectTextDecal(targetText, positionMM = null, textColor = '#000000', fontSize = null, baseDecalHeight = 0.45) {
-            if (!model) return;
+    controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.enableZoom = false;
 
-            const scaleToScene = 0.01;
-            
-            let hitPoint, hitNormal, targetMesh;
+    const ambientLight = new THREE.AmbientLight(0xffffff, 1);
+    scene.add(ambientLight);
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+    dirLight.position.set(5, 10, 7);
+    scene.add(dirLight);
 
-            if (positionMM) {
-                hitPoint = new THREE.Vector3(
-                    positionMM.x * scaleToScene,
-                    positionMM.y * scaleToScene, 
-                    positionMM.z * scaleToScene
-                );
-                
-                const rayOrigin = hitPoint.clone().add(new THREE.Vector3(0, 0, 2));
-                const rayDirection = new THREE.Vector3(0, 0, -1);
-                
-                const raycaster = new THREE.Raycaster();
-                raycaster.set(rayOrigin, rayDirection);
-                const intersects = raycaster.intersectObject(model, true);
-                
-                if (intersects.length > 0) {
-                    const hit = intersects[0];
-                    hitPoint = hit.point.clone();
-                    hitNormal = hit.face.normal.clone().transformDirection(hit.object.matrixWorld).normalize();
-                    targetMesh = hit.object;
-                    
-                    if (hitNormal.z < 0) {
-                        hitNormal.negate();
-                    }
-                } else {
-                    hitNormal = new THREE.Vector3(0, 0, 1);
-                    model.traverse((child) => {
-                        if (child.isMesh && !targetMesh) {
-                            targetMesh = child;
-                        }
-                    });
-                }
-            } else {
-                const raycaster = new THREE.Raycaster();
-                const origin = camera.position.clone();
-                const target = new THREE.Vector3(0, 0, 0);
-                const direction = target.clone().sub(origin).normalize();
+    loadModel();
 
-                raycaster.set(origin, direction);
-                const intersects = raycaster.intersectObject(model, true);
-                if (!intersects.length) return;
+    window.addEventListener('resize', onWindowResize, false);
+    animate();
+  }
 
-                const hit = intersects[0];
-                hitPoint = hit.point.clone();
-                hitNormal = hit.face.normal.clone().transformDirection(hit.object.matrixWorld).normalize();
-                targetMesh = hit.object;
-            }
+  function onWindowResize() {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  }
 
-            if (!targetMesh) return;
+  function animate() {
+    requestAnimationFrame(animate);
+    if (model) model.rotation.y += 0.005;
+    controls.update();
+    renderer.render(scene, camera);
+  }
 
-            const orientation = new THREE.Euler();
-            const quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), hitNormal);
-            orientation.setFromQuaternion(quat);
+  // ======== CARGAR MODELO Y TEXTO ==========
+  function loadModel() {
+    const loader = new GLTFLoader();
+    loader.load('tarjeta.glb', (gltf) => {
+      model = gltf.scene;
+      scene.add(model);
 
-            // Crear la textura y obtener su proporción real
-            const textData = createTextTexture(targetText, textColor, fontSize || 200);
-            
-            // Calcular el tamaño del decal basado en la proporción real del texto
-            const decalHeight = baseDecalHeight;
-            const decalWidth = decalHeight * textData.aspectRatio;
-            
-            const size = new THREE.Vector3(decalWidth, decalHeight, 0.2);
+      const fontLoader = new FontLoader();
+      fontLoader.load('https://threejs.org/examples/fonts/helvetiker_regular.typeface.json', (loadedFont) => {
+        font = loadedFont;
+        addTextDecals(cardData || {}); // aquí ya inyectamos los datos dinámicos
+      });
+    });
+  }
 
-            const decalGeometry = new DecalGeometry(targetMesh, hitPoint, orientation, size);
+  function projectTextDecal(text, position, color, size, height) {
+    if (!font) return;
+    const geometry = new TextGeometry(text, {
+      font: font,
+      size: size / 1000,
+      height: height,
+      curveSegments: 12,
+      bevelEnabled: false
+    });
+    const material = new THREE.MeshStandardMaterial({ color });
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.position.set(position.x, position.y, position.z);
+    mesh.rotation.y = Math.PI; // texto mirando hacia adelante
+    model.add(mesh);
+  }
 
-            const decalMaterial = new THREE.MeshStandardMaterial({
-                map: textData.texture,
-                transparent: true,
-                color: 0xffffff,
-                metalness: 0,
-                roughness: 1,
-                depthTest: true,
-                depthWrite: false,
-                polygonOffset: true,
-                polygonOffsetFactor: -4
-            });
+  function addTextDecals(data) {
+    const fixedFontSize = 500;
+    const decalHeight = 0.45;
 
-            const decalMesh = new THREE.Mesh(decalGeometry, decalMaterial);
-            decalMesh.renderOrder = 1;
-            
-            model.add(decalMesh);
-        }
-        
-        function init() {
-            // Scene
-            scene = new THREE.Scene();
-            
-            // Camera
-            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.set(0, 0, 4);
-            
-            // Renderer optimizado
-            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-            renderer.setClearColor(0x000000, 0);
-            renderer.shadowMap.enabled = true;
-            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-            document.body.appendChild(renderer.domElement);
-            
-            // Lights
-            const ambientLight = new THREE.AmbientLight(0x404040, 0.4);
-            scene.add(ambientLight);
-            
-            const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
-            directionalLight.position.set(0, 10, 5);
-            directionalLight.castShadow = true;
-            scene.add(directionalLight);
-            
-            const pointLight = new THREE.PointLight(0x6699ff, 9, 100);
-            pointLight.position.set(0, 5, 0);
-            scene.add(pointLight);
-            
-            const fillLight = new THREE.HemisphereLight(0xffffff, 0x444444, 9);
-            scene.add(fillLight);
-            
-            const leftZenitalLight = new THREE.DirectionalLight(0xffffff, 0.6);
-            leftZenitalLight.position.set(-5, 10, 0);
-            leftZenitalLight.castShadow = true;
-            scene.add(leftZenitalLight);
-            
-            const rightZenitalLight = new THREE.DirectionalLight(0xffffff, 0.6);
-            rightZenitalLight.position.set(5, 10, 0);
-            rightZenitalLight.castShadow = true;
-            scene.add(rightZenitalLight);
+    projectTextDecal(data.buyer || "Desconocido", { x: 59, y: 69, z: 50 }, '#FFFFFF', fixedFontSize, decalHeight);
+    projectTextDecal(data.date || "Fecha", { x: 59, y: 20, z: 50 }, '#FFFFFF', fixedFontSize, decalHeight);
+    projectTextDecal(data.figure || "Figura", { x: 59, y: -33, z: 50 }, '#FFFFFF', fixedFontSize, decalHeight);
+    projectTextDecal(data.version || "Versión", { x: 59, y: -86, z: 50 }, '#FFFFFF', fixedFontSize, decalHeight);
+    projectTextDecal(data.series_name || "Serie", { x: 59, y: -138, z: 50 }, '#FFFFFF', 350, decalHeight);
+    projectTextDecal(data.figure_number || "0/0", { x: 6, y: -230, z: 50 }, '#FFFFFF', 1000, decalHeight);
+  }
 
-            // Entorno HDR simulado con CubeTexture
-            const envLoader = new THREE.CubeTextureLoader();
-            const envMap = envLoader.load([
-                'https://threejs.org/examples/textures/cube/Bridge2/posx.jpg',
-                'https://threejs.org/examples/textures/cube/Bridge2/negx.jpg',
-                'https://threejs.org/examples/textures/cube/Bridge2/posy.jpg',
-                'https://threejs.org/examples/textures/cube/Bridge2/negy.jpg',
-                'https://threejs.org/examples/textures/cube/Bridge2/posz.jpg',
-                'https://threejs.org/examples/textures/cube/Bridge2/negz.jpg'
-            ]);
-            scene.environment = envMap;
-            
-            // Función unificada para obtener posición
-            function getEventPosition(event) {
-                if (event.touches && event.touches.length > 0) {
-                    return { x: event.touches[0].clientX, y: event.touches[0].clientY };
-                }
-                return { x: event.clientX, y: event.clientY };
-            }
-            
-            // Event handlers unificados para mouse y touch
-            function handleStart(event) {
-                event.preventDefault();
-                isDragging = true;
-                hasUserInteracted = true;
-                const pos = getEventPosition(event);
-                previousPosition.x = pos.x;
-                previousPosition.y = pos.y;
-            }
-            
-            function handleMove(event) {
-                if (isDragging && model) {
-                    event.preventDefault();
-                    const pos = getEventPosition(event);
-                    const deltaX = pos.x - previousPosition.x;
-                    const deltaY = pos.y - previousPosition.y;
+  // ======== CARGA DE DATOS DESDE GOOGLE SHEETS ==========
+  const params = new URLSearchParams(window.location.search);
+  const id = params.get("id");
+  const apiUrl = "https://script.google.com/macros/s/AKfycbzJCmg2WfvvJPU73zC5hcP7Bla1AdclUc7y524hN4lavCfhFuuNWBzwpxvzqRDDqbWk/exec?id=" + id;
 
-                    rotationVelocityY = deltaX * 0.005;
-                    rotationVelocityX = deltaY * 0.0025;
-
-                    previousPosition.x = pos.x;
-                    previousPosition.y = pos.y;
-                }
-            }
-            
-            function handleEnd(event) {
-                event.preventDefault();
-                isDragging = false;
-            }
-            
-            // Mouse events
-            renderer.domElement.addEventListener('mousedown', handleStart);
-            renderer.domElement.addEventListener('mousemove', handleMove);
-            renderer.domElement.addEventListener('mouseup', handleEnd);
-            renderer.domElement.addEventListener('mouseleave', handleEnd);
-            
-            // Touch events para móviles
-            renderer.domElement.addEventListener('touchstart', handleStart, { passive: false });
-            renderer.domElement.addEventListener('touchmove', handleMove, { passive: false });
-            renderer.domElement.addEventListener('touchend', handleEnd, { passive: false });
-            renderer.domElement.addEventListener('touchcancel', handleEnd, { passive: false });
-            
-            // Load GLTF model
-            const loader = new GLTFLoader();
-            console.log('Loading model...');
-            
-            loader.load(
-                'https://raw.githubusercontent.com/upandunder/paso-a-paso/main/tarjeta%20sofubi%20v66.glb',
-                function(gltf) {
-                    console.log('Model loaded successfully:', gltf);
-                    model = gltf.scene;
-                    
-                    // Material dorado con reflejos HDR
-                    const goldMaterial = new THREE.MeshStandardMaterial({
-                        color: 0xb8860b,
-                        metalness: 1,
-                        roughness: 0.2,
-                        envMap: envMap,
-                        envMapIntensity: 1.5
-                    });
-                    
-                    model.traverse((child) => {
-                        if (child.isMesh) {
-                            child.material = goldMaterial;
-                            child.castShadow = true;
-                            child.receiveShadow = true;
-                        }
-                    });
-                    
-                    // Centrar modelo
-                    const box = new THREE.Box3().setFromObject(model);
-                    const center = box.getCenter(new THREE.Vector3());
-                    model.position.sub(center);
-                    
-                    // Escalar si es necesario
-                    const size = box.getSize(new THREE.Vector3());
-                    const maxDim = Math.max(size.x, size.y, size.z);
-                    const scale = 4 / maxDim;
-                    model.scale.setScalar(scale);
-                    
-                    scene.add(model);
-                    console.log('Model added to scene with gold material');
-
-                    // ===== DECALS CON TAMAÑOS Y PROPORCIONES CORRECTAS =====
-                    
-                    // Ahora las letras mantienen su proporción correcta
-                    // El decal se ajusta automáticamente al ancho real del texto
-                    const fixedFontSize = 300; // Tamaño consistente para todas las letras
-                    const decalHeight = 0.45; // Altura consistente para todos los decals
-                    
-                    projectTextDecal('PATRICIO LOYOLA R', { x: 59, y: 69, z: 50 }, '#343419', fixedFontSize, decalHeight);
-                    projectTextDecal('24-08-2025', { x: 59, y: 20, z: 50 }, '#343419', fixedFontSize, decalHeight);
-                    projectTextDecal('KUERORO', { x: 59, y: -33, z: 50 }, '#343419', fixedFontSize, decalHeight);
-                    projectTextDecal('STANDAR', { x: 59, y: -86, z: 50 }, '#343419', fixedFontSize, decalHeight);
-                    projectTextDecal('CHILEAN MYTHICAL KAIJU', { x: 59, y: -138, z: 50 }, '#343419', 250, decalHeight);
-                  projectTextDecal('1/250', { x: 6, y: -230, z: 50 }, '#343419', 600, decalHeight);
-                    
-                    // Ejemplos adicionales con diferentes tamaños de fuente si necesitas variación:
-                    // projectTextDecal('SMALL TEXT', { x: 0, y: -40, z: 50 }, '#FF6600', 150, 0.3); // Texto más pequeño
-                    // projectTextDecal('LARGE TEXT', { x: 0, y: 40, z: 50 }, '#9400D3', 250, 0.6); // Texto más grande
-                },
-                function(progress) {
-                    console.log('Loading progress: ', (progress.loaded / progress.total * 100) + '%');
-                },
-                function(error) {
-                    console.error('Error loading model: ', error);
-                    
-                    // Fallback cube
-                    const geometry = new THREE.BoxGeometry(2, 2, 2);
-                    const material = new THREE.MeshStandardMaterial({ color: 0x6699ff });
-                    const cube = new THREE.Mesh(geometry, material);
-                    scene.add(cube);
-                    model = cube;
-                    console.log('Added fallback cube');
-                }
-            );
-            
-            // Handle window resize
-            window.addEventListener('resize', onWindowResize, false);
-            
-            // Start animation loop
-            animate();
-        }
-        
-        function animate() {
-            requestAnimationFrame(animate);
-
-            if (model) {
-                // Rotación automática solo hasta la primera interacción + inercia de arrastre
-                const autoRotate = hasUserInteracted ? 0 : 0.02;
-                model.rotation.y += autoRotate + rotationVelocityY;
-                model.rotation.x += rotationVelocityX;
-
-                // Suavizar inercia
-                rotationVelocityX *= 0.95;
-                rotationVelocityY *= 0.95;
-            }
-
-            renderer.render(scene, camera);
-        }
-        
-        function onWindowResize() {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        }
-        
-        // Initialize when page loads
-        init();
-    </script>
+  fetch(apiUrl)
+    .then(res => res.json())
+    .then(data => {
+      cardData = data;
+      init(); // solo inicializamos cuando tenemos datos
+    })
+    .catch(err => {
+      console.error("Error cargando datos", err);
+      init(); // iniciamos igual con textos por defecto
+    });
+</script>
 </body>
 </html>
