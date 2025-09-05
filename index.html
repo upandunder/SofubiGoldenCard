@@ -105,7 +105,7 @@
   // ======== CARGA DE DATOS DESDE GOOGLE SHEETS ==========
   const params = new URLSearchParams(window.location.search);
   const id = params.get("id");
-  const apiUrl = "https://script.google.com/macros/s/AKfycbzJCmg2WfvvJPU73zC5hcP7Bla1AdclUc7y524hN4lavCfhFuuNWBzwpxvzqRDDqbWk/exec?id=" + id;
+  const apiUrl = "https://script.google.com/macros/s/AKfycbwnMnhCzbzGqAy4cmM0Bp-cccwV98qOhZu16qokGiacM-1-bij5b5TX5VhpLbWFEzEP/exec" + id;
 
   fetch(apiUrl)
     .then(res => res.json())
